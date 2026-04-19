@@ -9,7 +9,7 @@ from openai import AsyncOpenAI
 TG_TOKEN = os.getenv("TG_TOKEN")
 AI_KEY = os.getenv("AI_KEY")
 
-# Исправленный клиент для Groq
+# Упрощенная настройка клиента
 client = AsyncOpenAI(
     api_key=AI_KEY,
     base_url="https://groq.com"
@@ -18,36 +18,35 @@ client = AsyncOpenAI(
 bot = Bot(token=TG_TOKEN)
 dp = Dispatcher()
 
-PROMPT = "Ты дерзкий комик. Отвечай короткими, саркастичными шутками на русском языке. Будь острым, используй сленг, подкалывай пользователя."
-
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    photo_name = "IMG_20260419_225749_338.jpg" 
-    if os.path.exists(photo_name):
-        await message.answer_photo(photo=FSInputFile(photo_name), caption="Привет! я шутник-бот! веселись!")
+    # Поиск любого фото в папке
+    photo = next((f for f in os.listdir() if f.lower().endswith(('.jpg', '.png', '.jpeg'))), None)
+    if photo:
+        await message.answer_photo(photo=FSInputFile(photo), caption="Привет! я шутник-бот! веселись!")
     else:
-        await message.answer("Привет! я шутник-бот! веселись!")
+        await message.answer("Привет! я шутник-бот! (фото не нашел)")
 
 @dp.message(F.text)
 async def chat(message: types.Message):
     try:
-        # Используем максимально стабильную модель Llama 3
+        # Пробуем другую модель, иногда 70b капризничает на бесплатных аккаунтах
         response = await client.chat.completions.create(
-            model="llama3-70b-8192", 
+            model="llama3-8b-8192", 
             messages=[
-                {"role": "system", "content": PROMPT},
+                {"role": "system", "content": "Ты дерзкий комик. Отвечай коротко и смешно на русском."},
                 {"role": "user", "content": message.text}
             ]
         )
         await message.reply(response.choices.message.content)
     except Exception as e:
-        # Если снова будет ошибка, мы увидим её подробнее
-        await message.reply(f"Ошибка: {str(e)}")
+        await message.reply(f"Все еще ошибка: {str(e)[:100]}")
 
 async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
