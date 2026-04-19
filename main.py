@@ -33,7 +33,7 @@ async def start(message: types.Message):
 async def chat(message: types.Message):
     try:
         response = await client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
+            model="llama3-8b-8192",
             messages=[{"role": "system", "content": PROMPT}, {"role": "user", "content": message.text}]
         )
         await message.reply(response.choices.message.content)
