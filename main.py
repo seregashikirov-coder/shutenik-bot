@@ -6,6 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import FSInputFile
 
 # Берем ключи из настроек Railway
+# Убедись, что в Railway в Variables ты обновил TG_TOKEN на новый!
 TG_TOKEN = os.getenv("TG_TOKEN")
 AI_KEY = os.getenv("AI_KEY")
 
@@ -16,9 +17,10 @@ async def get_ai_answer(user_text):
     url = "https://openrouter.ai"
     headers = {
         "Authorization": f"Bearer {AI_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://railway.app", # Нужно для OpenRouter
     }
-    # Используем Mistral — она стабильнее всего на OpenRouter
+    # Используем Mistral — она самая стабильная среди бесплатных
     data = {
         "model": "mistralai/mistral-7b-instruct:free",
         "messages": [
@@ -32,12 +34,13 @@ async def get_ai_answer(user_text):
                 if resp.status == 200:
                     res = await resp.json()
                     if 'choices' in res and len(res['choices']) > 0:
-                        return res['choices'][0]['message']['content']
-                    return "ИИ прислал пустой ответ, спроси еще раз."
+                        return res['choices']['message']['content']
+                    return "ИИ прислал пустой ответ, попробуй еще раз."
                 else:
-                    return f"ИИ приуныл (код {resp.status})"
-        except Exception:
-            return "Что-то с сетью, я не смог придумать шутку."
+                    status_text = await resp.text()
+                    return f"ИИ приуныл (ошибка {resp.status})"
+        except Exception as e:
+            return f"Ошибка связи: {str(e)[:40]}"
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -50,19 +53,23 @@ async def start(message: types.Message):
             caption="Привет! я шутник-бот! веселись!"
         )
     else:
+        # Если фото не найдено, бот просто пришлет текст
         await message.answer("Привет! я шутник-бот! веселись!")
 
 @dp.message(F.text)
 async def chat(message: types.Message):
-    # Получаем ответ от ИИ
+    # Сначала бот может отправить уведомление, что он думает (по желанию)
     answer = await get_ai_answer(message.text)
     await message.reply(answer)
 
 async def main():
+    # Удаляем вебхуки, чтобы не было конфликтов (важно!)
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
