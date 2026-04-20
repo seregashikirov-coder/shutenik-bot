@@ -13,16 +13,16 @@ bot = Bot(token=TG_TOKEN)
 dp = Dispatcher()
 
 async def get_ai_answer(user_text):
-    # Прямой запрос к OpenRouter
     url = "https://openrouter.ai"
     headers = {
         "Authorization": f"Bearer {AI_KEY}",
         "Content-Type": "application/json"
     }
+    # Используем Mistral — она стабильнее всего на OpenRouter
     data = {
-        "model": "google/gemma-2-9b-it:free", # Мощная бесплатная модель
+        "model": "mistralai/mistral-7b-instruct:free",
         "messages": [
-            {"role": "system", "content": "Ты дерзкий комик. Отвечай на сообщения короткими, нестандартными шутками на русском. Твой юмор — смесь сарказма и хайпа. Подколы обязательны."},
+            {"role": "system", "content": "Ты дерзкий комик. Отвечай на русском языке короткими саркастичными шутками. Подколы обязательны."},
             {"role": "user", "content": user_text}
         ]
     }
@@ -31,15 +31,17 @@ async def get_ai_answer(user_text):
             async with session.post(url, headers=headers, json=data) as resp:
                 if resp.status == 200:
                     res = await resp.json()
-                    return res['choices']['message']['content']
+                    if 'choices' in res and len(res['choices']) > 0:
+                        return res['choices'][0]['message']['content']
+                    return "ИИ прислал пустой ответ, спроси еще раз."
                 else:
-                    return f"Ошибка ИИ (код {resp.status})"
-        except Exception as e:
-            return f"Ошибка сети: {str(e)[:50]}"
+                    return f"ИИ приуныл (код {resp.status})"
+        except Exception:
+            return "Что-то с сетью, я не смог придумать шутку."
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    # Твое название фото, которое мы видели на скриншоте
+    # Твое название фото из репозитория
     photo_name = "IMG_20260419_225749_338.jpg" 
     
     if os.path.exists(photo_name):
@@ -48,12 +50,11 @@ async def start(message: types.Message):
             caption="Привет! я шутник-бот! веселись!"
         )
     else:
-        # Если вдруг фото не найдено, бот просто напишет текст
         await message.answer("Привет! я шутник-бот! веселись!")
 
 @dp.message(F.text)
 async def chat(message: types.Message):
-    # Получаем дерзкую шутку от ИИ
+    # Получаем ответ от ИИ
     answer = await get_ai_answer(message.text)
     await message.reply(answer)
 
@@ -62,6 +63,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
